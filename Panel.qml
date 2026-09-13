@@ -13,7 +13,7 @@ import "Model.js" as Model
 // find-my-earbuds and the host audio codec.
 Panel {
   id: root
-  moduleName: "frank.nothingear"
+  moduleName: "nothing-ear"
   ipcTarget: "nothing-ear"
   // manageIpc: false so this panel can own the single IpcHandler the target
   // allows and add its own verbs to it.

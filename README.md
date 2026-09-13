@@ -52,7 +52,7 @@ runs for the length of one call.
 
 ```bash
 omarchy plugin add https://github.com/alanwcurry-dev/omarchy-nothing-ear --enable --yes
-omarchy bar move frank.nothingear --after omarchy.bluetooth
+omarchy bar move nothing-ear --after omarchy.bluetooth
 ```
 
 Pair the earbuds through the normal Bluetooth panel first.
@@ -60,7 +60,7 @@ Pair the earbuds through the normal Bluetooth panel first.
 ## Remove
 
 ```bash
-omarchy plugin remove frank.nothingear --yes
+omarchy plugin remove nothing-ear --yes
 rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/nothing-ear"   # the case cache
 ```
 
@@ -126,13 +126,13 @@ channel never blanks a reading that is still meaningful.
 | `refreshSeconds` | `60` | How often the bar icon re-reads the earbuds while connected. |
 
 Which pair is detected automatically; `deviceAddress` only pins one. The
-settings UI is Setup → Plugins, or `omarchy bar set frank.nothingear <key> <value>`.
+settings UI is Setup → Plugins, or `omarchy bar set nothing-ear <key> <value>`.
 
 Toggle the percentage without opening a settings UI:
 
 ```bash
-omarchy bar set frank.nothingear showBatteryPercent false --json
-omarchy bar set frank.nothingear showBatteryPercent true  --json
+omarchy bar set nothing-ear showBatteryPercent false --json
+omarchy bar set nothing-ear showBatteryPercent true  --json
 ```
 
 ## Controls
