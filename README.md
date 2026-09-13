@@ -34,16 +34,38 @@ The case only reports while an earbud is docked in it and the lid is open.
 Once the earbuds come out, the last reading stays on screen, dimmed and aged,
 for 6 hours.
 
+## Requirements
+
+- Omarchy 4 (the shell plugin API this is built against)
+- `python3` — the helper runs on system Python (`/usr/bin/python3`), which must
+  be built with Bluetooth socket support; a version-manager Python (mise,
+  pyenv, uv) may not be, and the plugin calls `/usr/bin/python3` directly for
+  that reason
+- `bluez` / `bluez-utils` for `bluetoothctl`
+- PipeWire with `pactl` for the codec picker (the rest of the panel needs
+  neither)
+
+No Python packages, no pip install, no daemon: the helper is stdlib only and
+runs for the length of one call.
+
 ## Install
 
 ```bash
-omarchy-shell shell rescanPlugins
-omarchy plugin enable frank.nothingear
-omarchy bar move frank.nothingear --section right    # or use the bar's own drag
+omarchy plugin add https://github.com/alanwcurry-dev/omarchy-nothing-ear --enable --yes
+omarchy bar move frank.nothingear --after omarchy.bluetooth
 ```
 
-Pair the earbuds through the normal Bluetooth panel first. The helper picks the
-first connected device whose name contains `Nothing`, `Ear` or `CMF`.
+Pair the earbuds through the normal Bluetooth panel first.
+
+## Remove
+
+```bash
+omarchy plugin remove frank.nothingear --yes
+rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/nothing-ear"   # the case cache
+```
+
+Removing the plugin from the bar is enough to stop it; the second line clears
+the remembered case readings. The earbuds keep whatever settings they had.
 
 ## Multiple pairs
 
