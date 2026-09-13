@@ -15,8 +15,9 @@ and `pactl`.
 
 ## Features
 
-- Bar icon: the earbud artwork with the weakest bud's percentage beside it,
-  turning urgent below 20%, and the full breakdown in the tooltip
+- Bar icon: the earbud artwork with the weakest bud's percentage beside it
+  (switchable with the `showBatteryPercent` setting), turning urgent below 20%,
+  and the full breakdown in the tooltip
 - Left, right and case battery, with a charging pulse and `in ear` / `out of
   ear` state per bud
 - Noise control: Off, Transparency, Adaptive, Low, Medium, High
@@ -47,9 +48,17 @@ first connected device whose name contains `Nothing`, `Ear` or `CMF`.
 | Key | Default | What it does |
 | --- | --- | --- |
 | `hideWhenDisconnected` | `true` | Hide the icon while the earbuds are away. An error keeps it visible. |
+| `showBatteryPercent` | `true` | Show the battery percentage beside the icon. Off leaves the artwork alone; the tooltip and panel still report the battery. |
 | `deviceAddress` | `""` | Pin a Bluetooth address, for when several matching devices are paired. |
 | `helperPath` | `""` | Use a different `nothing-earctl.py`. Empty uses the bundled one. |
 | `refreshSeconds` | `60` | How often the bar icon re-reads the earbuds while connected. |
+
+Toggle the percentage without opening a settings UI:
+
+```bash
+omarchy bar set frank.nothingear showBatteryPercent false --json
+omarchy bar set frank.nothingear showBatteryPercent true  --json
+```
 
 ## Controls
 

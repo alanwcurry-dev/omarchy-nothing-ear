@@ -192,7 +192,8 @@ Panel {
     if (ear.aggregateBattery !== Model.LEVEL_UNKNOWN) return ear.aggregateBattery + "%"
     return ""
   }
-  readonly property bool barLabelVisible: root.batteryLabel !== "" && !(bar ? bar.vertical : false)
+  readonly property bool barLabelVisible: setting("showBatteryPercent", true) === true
+    && root.batteryLabel !== "" && !(bar ? bar.vertical : false)
 
   // The bar slot has to reserve the number's width before the icon component
   // exists, so measure the text here rather than reaching into the component.

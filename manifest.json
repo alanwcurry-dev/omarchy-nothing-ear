@@ -20,6 +20,7 @@
     "defaultSection": "right",
     "defaults": {
       "hideWhenDisconnected": true,
+      "showBatteryPercent": true,
       "deviceAddress": "",
       "helperPath": "",
       "refreshSeconds": 60
@@ -29,6 +30,13 @@
         "key": "hideWhenDisconnected",
         "type": "boolean",
         "label": "Hide the icon while the earbuds are away",
+        "defaultValue": true
+      },
+      {
+        "key": "showBatteryPercent",
+        "type": "boolean",
+        "label": "Show the battery percentage beside the icon",
+        "description": "Off leaves the artwork alone on the bar; the tooltip and panel still report the battery.",
         "defaultValue": true
       },
       {
