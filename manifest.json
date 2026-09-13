@@ -43,7 +43,7 @@
         "key": "deviceAddress",
         "type": "string",
         "label": "Bluetooth address (optional)",
-        "description": "Leave empty to use the connected Nothing/Ear/CMF device found by bluetoothctl.",
+        "description": "Leave empty to detect the pair automatically; the one carrying audio wins when several are connected.",
         "defaultValue": ""
       },
       {

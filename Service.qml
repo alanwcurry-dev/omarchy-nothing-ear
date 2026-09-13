@@ -67,15 +67,19 @@ Item {
   // How often the bar icon refreshes the battery on its own while connected.
   readonly property int refreshSeconds: Math.max(15, Math.min(900, Number(setting("refreshSeconds", 60)) || 60))
 
-  // Which paired earbuds this widget talks to. A pinned address from settings
-  // wins, then the pair picked in this session, then whatever is connected —
-  // so taking the other pair off the desk keeps working on its own.
+  // Which paired earbuds this widget talks to, without anyone choosing: the
+  // pair carrying audio wins, then any connected pair, so putting one set down
+  // and picking up the other just works.
   readonly property string pinnedAddress: String(setting("deviceAddress", "") || "")
   property string selectedAddress: ""
   readonly property var bluezDevices: Bluetooth.devices ? Bluetooth.devices.values : []
   readonly property var nothingDevices: Model.nothingDevices(bluezDevices)
+  readonly property int connectedCount: countConnected(nothingDevices)
   readonly property string requestedAddress: pinnedAddress !== "" ? pinnedAddress : selectedAddress
-  readonly property var targetDevice: Model.resolveDevice(nothingDevices, requestedAddress)
+  // The pair PipeWire is routing to, only needed when several are connected.
+  property string audioAddress: ""
+  readonly property bool needsAudioProbe: requestedAddress === "" && connectedCount > 1
+  readonly property var targetDevice: Model.resolveDevice(nothingDevices, requestedAddress, audioAddress)
   readonly property string targetAddress: targetDevice ? String(targetDevice.address || "") : ""
   readonly property bool bluezConnected: !!(targetDevice && targetDevice.connected)
   // The aggregate battery BlueZ itself reports for the target, used only to
@@ -106,13 +110,21 @@ Item {
     return command
   }
 
-  // Switch which earbuds the widget follows. `query` is an address or any part
-  // of the name, so "open", "ear 3" and a full MAC all work.
+  // Switch which earbuds the widget follows. No UI needs this: the widget
+  // detects the pair by itself, and this exists for scripts and for pinning a
+  // choice that must survive a swap.
   function selectDevice(query) {
     var found = Model.findDevice(nothingDevices, query)
     if (!found) return false
     selectedAddress = found.address
     forgetDevice()
+    refresh()
+    return true
+  }
+
+  // Back to detecting the pair by itself.
+  function clearSelection() {
+    selectedAddress = ""
     refresh()
     return true
   }
@@ -127,6 +139,29 @@ Item {
         battery: device.battery
       }
     })
+  }
+
+  function countConnected(devices) {
+    var count = 0
+    var list = devices || []
+    for (var i = 0; i < list.length; i++)
+      if (list[i].connected) count++
+    return count
+  }
+
+  // Only asked when two pairs are connected at once: the one the desktop is
+  // playing through — or, failing that, the one it defaults to — is the best
+  // guess at which pair is on someone's head.
+  function runAudioProbe() {
+    if (!needsAudioProbe) {
+      audioAddress = ""
+      return
+    }
+    if (!audioProbe.running) audioProbe.running = true
+  }
+
+  function parseSinks(text) {
+    audioAddress = Model.parseSinkList(text)
   }
 
   // One process at a time: the control channel is a single slot, so a read
@@ -446,6 +481,25 @@ Item {
     onTriggered: {
       if (root.pendingAction && root.pendingAction.confirmed) root.clearPending()
     }
+  }
+
+  // Re-asked only while two pairs are connected, so the widget follows the
+  // audio when someone swaps earbuds mid-session.
+  onNeedsAudioProbeChanged: root.runAudioProbe()
+
+  Timer {
+    id: audioProbeTimer
+    interval: 15000
+    repeat: true
+    running: root.needsAudioProbe
+    onTriggered: root.runAudioProbe()
+  }
+
+  Process {
+    id: audioProbe
+    command: ["sh", "-c", "pactl get-default-sink; echo ---; pactl list short sinks"]
+    stdout: StdioCollector { id: audioProbeOut; waitForEnd: true }
+    onExited: function () { root.parseSinks(String(audioProbeOut.text || "")) }
   }
 
   Process {

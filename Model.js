@@ -246,17 +246,53 @@ function findDevice(devices, query) {
   return null
 }
 
-// The device the plugin talks to. An address the user pinned (settings) or
-// picked in the panel wins even while it is away, so the choice is never
-// silently overridden; with neither, a connected pair wins, then any known one.
-function resolveDevice(devices, preferredAddress) {
+// The device the plugin talks to, resolved without being asked: a pinned
+// address (settings) or an explicit pick wins, then the pair the desktop is
+// actually routing audio to, then any connected pair, then any known one.
+function resolveDevice(devices, preferredAddress, audioAddress) {
   var list = devices || []
   if (list.length === 0) return null
   var preferred = findDevice(list, preferredAddress)
   if (preferred) return preferred
+  var audio = findDevice(list, audioAddress)
+  if (audio && audio.connected) return audio
   for (var i = 0; i < list.length; i++)
     if (list[i].connected) return list[i]
   return list[0]
+}
+
+// BlueZ exposes PipeWire sinks as bluez_output.3C_B0_ED_51_18_FD.1, so the
+// address of the pair currently carrying audio is in the sink name.
+function addressFromSinkName(name) {
+  var value = String(name || "")
+  var marker = value.indexOf("bluez_output.")
+  if (marker < 0) return ""
+  var rest = value.substring(marker + "bluez_output.".length)
+  var stop = rest.indexOf(".")
+  var encoded = stop < 0 ? rest : rest.substring(0, stop)
+  var parts = encoded.split("_")
+  return parts.length === 6 ? parts.join(":").toUpperCase() : ""
+}
+
+// `pactl get-default-sink` followed by `pactl list short sinks`, separated by a
+// --- line: the pair to follow is the one playing, else the default, else any.
+function parseSinkList(text) {
+  var sections = String(text || "").split("---")
+  var defaultAddress = addressFromSinkName(sections.length > 0 ? sections[0].trim() : "")
+  var playing = ""
+  var fallback = ""
+  var lines = (sections.length > 1 ? sections[1] : "").split("\n")
+  for (var i = 0; i < lines.length; i++) {
+    var fields = lines[i].trim().split(/\s+/)
+    if (fields.length < 4) continue
+    var address = addressFromSinkName(fields[1])
+    if (address === "") continue
+    // The state is the last column; the format column before it has spaces.
+    var state = fields[fields.length - 1]
+    if (fallback === "") fallback = address
+    if (state === "RUNNING" && playing === "") playing = address
+  }
+  return playing !== "" ? playing : (defaultAddress !== "" ? defaultAddress : fallback)
 }
 
 // The panel and the service hand readings around as objects, so the helpers

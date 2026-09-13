@@ -47,24 +47,31 @@ first connected device whose name contains `Nothing`, `Ear` or `CMF`.
 
 ## Multiple pairs
 
-Everything paired is listed in the panel's **EARBUDS** section (the section
-appears only when more than one pair is known, e.g. an Ear (3) and an Ear
-(open)). The widget reads and controls the selected pair; the other keeps its
-own settings on the device.
+Everything paired is detected on its own — there is no device picker. The
+widget follows:
 
-Which pair it follows, in order:
+1. `deviceAddress` from settings, if you set one (an escape hatch, not the
+   normal path),
+2. the pair currently carrying audio — the one the desktop is playing through,
+3. otherwise any connected pair, so taking one set off the desk and picking up
+   the other just works.
 
-1. `deviceAddress` from settings, if set — this always wins, even while that
-   pair is away, so a pinned choice is never silently overridden.
-2. The pair picked in the panel or with `omarchy-shell nothing-ear use`, for as
-   long as the shell runs.
-3. Otherwise the connected pair, so taking the other one off the desk keeps the
-   widget useful on its own.
+The pick is made from PipeWire's own state: a BlueZ sink is named
+`bluez_output.<address>.1`, so the address of the pair that is playing (or the
+default) is read straight out of `pactl`, and re-checked every 15 seconds while
+two pairs are connected at once.
+
+Verified with both pairs connected: switching audio output from the Ear (open)
+to the Ear (3) moved the widget to the Ear (3) within one poll, with no manual
+selection.
+
+A name fragment or address still works as an override from a script:
 
 ```bash
 omarchy-shell nothing-ear devices          # JSON: every paired pair, connected first
 omarchy-shell nothing-ear use open         # name fragment or a full address
 omarchy-shell nothing-ear use 2C:BE:EE:4B:CF:24
+omarchy-shell nothing-ear auto             # back to detecting it
 ./nothing-earctl.py devices                # the same list from the CLI
 ```
 
@@ -95,6 +102,9 @@ channel never blanks a reading that is still meaningful.
 | `deviceAddress` | `""` | Pin a Bluetooth address, for when several matching devices are paired. |
 | `helperPath` | `""` | Use a different `nothing-earctl.py`. Empty uses the bundled one. |
 | `refreshSeconds` | `60` | How often the bar icon re-reads the earbuds while connected. |
+
+Which pair is detected automatically; `deviceAddress` only pins one. The
+settings UI is Setup → Plugins, or `omarchy bar set frank.nothingear <key> <value>`.
 
 Toggle the percentage without opening a settings UI:
 
