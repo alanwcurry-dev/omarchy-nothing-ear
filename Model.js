@@ -29,7 +29,7 @@ var EQ_WIRE = { balanced: 0, voice: 1, treble: 2, bass: 3, advanced: 4, custom: 
 var BASS_MAX_LEVEL = 5
 
 function battery() {
-  return { level: LEVEL_UNKNOWN, charging: false, available: false, stale: false }
+  return { level: LEVEL_UNKNOWN, charging: false, available: false, stale: false, ageSeconds: -1 }
 }
 
 function defaultStatus() {
@@ -88,7 +88,9 @@ function component(raw, fallback) {
     level: level >= 0 && level <= 100 ? level : LEVEL_UNKNOWN,
     charging: bool(source.charging, false),
     available: bool(source.available, false) && level >= 0 && level <= 100,
-    stale: bool(source.stale, false)
+    stale: bool(source.stale, false),
+    // Only remembered readings carry it; -1 means the value is live.
+    ageSeconds: integer(source.age_seconds, -1)
   }
 }
 
@@ -288,6 +290,18 @@ function wearText(worn) {
 
 function anyCharging(left, right, caseReading, headset) {
   return charging(left) || charging(right) || charging(caseReading) || charging(headset)
+}
+
+// How stale a remembered reading is, in words short enough for a panel row.
+function ageText(seconds) {
+  var value = Number(seconds)
+  if (!isFinite(value) || value < 0) return "last seen"
+  if (value < 60) return "seen <1m ago"
+  var minutes = Math.round(value / 60)
+  if (minutes < 60) return "seen " + minutes + "m ago"
+  var hours = Math.round(minutes / 60)
+  if (hours < 24) return "seen " + hours + "h ago"
+  return "seen " + Math.round(hours / 24) + "d ago"
 }
 
 function charging(reading) {

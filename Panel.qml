@@ -478,6 +478,11 @@ Panel {
                 width: parent.width
                 label: "Case"
                 reading: ear.caseBattery
+                // The case has no radio of its own: it reports through a
+                // docked earbud, so a reading only exists while one sits in it.
+                note: ear.caseBattery.stale
+                  ? Model.ageText(ear.caseBattery.ageSeconds)
+                  : (ear.caseBattery.available ? "" : "docked only")
               }
             }
 
@@ -749,8 +754,12 @@ Panel {
     property var reading: Model.battery()
     // true, false, or null when the device does not report wear.
     property var wear: null
+    // Shown when there is no wear state: why the reading is what it is.
+    property string note: ""
 
-    readonly property string wearLabel: batteryRow.wear === null ? "" : Model.wearText(batteryRow.wear)
+    readonly property string sideText: batteryRow.wear === null
+      ? batteryRow.note
+      : Model.wearText(batteryRow.wear)
     readonly property bool low: batteryRow.reading.level !== Model.LEVEL_UNKNOWN
       && batteryRow.reading.level <= 20 && !batteryRow.reading.charging
     implicitHeight: batteryLayout.implicitHeight
@@ -806,13 +815,14 @@ Panel {
       }
 
       Text {
-        visible: batteryRow.wearLabel !== ""
-        text: batteryRow.wearLabel
+        visible: batteryRow.sideText !== ""
+        text: batteryRow.sideText
         color: root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
         horizontalAlignment: Text.AlignRight
-        Layout.preferredWidth: Style.space(52)
+        elide: Text.ElideRight
+        Layout.preferredWidth: Style.space(66)
       }
 
       Text {

@@ -19,7 +19,8 @@ and `pactl`.
   (switchable with the `showBatteryPercent` setting), turning urgent below 20%,
   and the full breakdown in the tooltip
 - Left, right and case battery, with a charging pulse and `in ear` / `out of
-  ear` state per bud
+  ear` state per bud; the case reports through a docked earbud, so its last
+  reading stays on screen dimmed with its age for six hours
 - Noise control: Off, Transparency, Adaptive, Low, Medium, High
 - Equalizer: Balanced, Voice, More treble, More bass, Custom
 - Bass enhance toggle at the level the earbuds already have
@@ -29,8 +30,9 @@ and `pactl`.
 - Firmware, protocol version and dual-connection state in the panel footer
 - Falls back to the single Bluetooth percentage if the control channel is busy
 
-The case only reports while it is open. Once it closes, the last reading stays
-on screen, dimmed, for 6 hours.
+The case only reports while an earbud is docked in it and the lid is open.
+Once the earbuds come out, the last reading stays on screen, dimmed and aged,
+for 6 hours.
 
 ## Install
 
@@ -69,6 +71,20 @@ omarchy-shell nothing-ear use 2C:BE:EE:4B:CF:24
 Models differ in what they expose: the Ear (open) has no noise control, so the
 panel leaves that section out and right-click stops cycling it, while battery,
 equalizer, bass enhance, low latency, find-my-earbuds and codec all still work.
+
+## Case battery
+
+The case has no radio of its own — it reports its charge through a docked
+earbud — so a reading only exists while an earbud sits in it with the lid open.
+The battery section says which of the three states you are looking at:
+
+- a live percentage, while an earbud is docked in an open case,
+- a dimmed `seen 12m ago` value for the last reading the case left behind, kept
+  per pair for six hours,
+- `docked only`, when nothing has been seen yet.
+
+The cache is applied whether or not the control channel answers, so a busy
+channel never blanks a reading that is still meaningful.
 
 ## Settings
 

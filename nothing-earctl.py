@@ -319,7 +319,7 @@ def parse_battery(payload: bytes) -> dict[str, dict[str, object]]:
 
 
 def parse_wear(payload: bytes) -> dict[str, object]:
-    """(component, flags) pairs; bit 2 is "in the ear", bit 7 "in the case"."""
+    """(component, flags) pairs; bit 2 is "in the ear" on the models seen so far."""
     wear: dict[str, object] = {"available": False, "left": None, "right": None}
     if not payload:
         return wear
@@ -510,34 +510,63 @@ def state_dir() -> Path:
     return Path(base) / "nothing-ear"
 
 
-def cache_case(case: dict[str, object], address: str) -> None:
+def read_case_cache() -> dict[str, object]:
+    """One file, one entry per address: two pairs must not overwrite each other."""
+    try:
+        data = json.loads((state_dir() / "case.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    devices = data.get("devices")
+    if isinstance(devices, dict):
+        return devices
+    # Older single-device file: keep its reading under its own address.
+    address = str(data.get("address", "")).lower()
+    if address and isinstance(data.get("case"), dict) and isinstance(data.get("saved"), int):
+        return {address: {"case": data["case"], "saved": data["saved"]}}
+    return {}
+
+
+def write_case_cache(devices: dict[str, object]) -> None:
     directory = state_dir()
     try:
         directory.mkdir(parents=True, exist_ok=True)
         (directory / "case.json").write_text(
-            json.dumps({"address": address, "case": case, "saved": int(time.time())}),
+            json.dumps({"schema_version": 1, "devices": devices}),
             encoding="utf-8",
         )
     except OSError:
         pass
 
 
+def cache_case(case: dict[str, object], address: str) -> None:
+    devices = read_case_cache()
+    now = int(time.time())
+    # Drop the entries that have expired, so the file cannot grow forever.
+    devices = {
+        key: value
+        for key, value in devices.items()
+        if isinstance(value, dict) and isinstance(value.get("saved"), int)
+        and now - value["saved"] <= CASE_CACHE_MAX_AGE
+    }
+    devices[address.lower()] = {"case": case, "saved": now}
+    write_case_cache(devices)
+
+
 def cached_case(address: str) -> dict[str, object] | None:
-    try:
-        data = json.loads((state_dir() / "case.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    entry = read_case_cache().get(address.lower())
+    if not isinstance(entry, dict):
         return None
-    if not isinstance(data, dict) or str(data.get("address", "")).lower() != address.lower():
-        return None
-    saved = data.get("saved")
+    saved = entry.get("saved")
     if not isinstance(saved, int) or time.time() - saved > CASE_CACHE_MAX_AGE:
         return None
-    case = data.get("case")
+    case = entry.get("case")
     if not isinstance(case, dict) or not isinstance(case.get("level"), int):
         return None
     # A remembered reading is not a live one: the panel dims it, and a charge
     # that ended hours ago must not keep a charging animation running.
-    return {**case, "charging": False, "stale": True}
+    return {**case, "charging": False, "stale": True, "age_seconds": int(time.time() - saved)}
 
 
 # --- snapshot --------------------------------------------------------------
@@ -639,13 +668,15 @@ def snapshot(device: dict[str, str] | None) -> dict[str, object]:
                 except OSError:
                     pass
 
-            case = battery.get("case")
-            if isinstance(case, dict) and case.get("available"):
-                cache_case(case, address)
-            else:
-                remembered = cached_case(address)
-                if remembered:
-                    battery["case"] = remembered
+        # The case cache is applied whether or not the control channel answered:
+        # a busy channel must not blank a reading that is still meaningful.
+        case = battery.get("case")
+        if isinstance(case, dict) and case.get("available"):
+            cache_case(case, address)
+        else:
+            remembered = cached_case(address)
+            if remembered:
+                battery["case"] = remembered
 
     return {
         "schema_version": 1,
