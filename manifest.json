@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "frank.nothingear",
+  "name": "Nothing Ear",
+  "version": "1.0.0",
+  "author": "frank",
+  "license": "MIT",
+  "description": "Nothing earbuds in the Omarchy bar: per-earbud and case battery, noise control, equalizer, bass enhance, low latency, find-my-earbuds, and the host audio codec.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Nothing Ear",
+    "description": "Battery, noise control, equalizer, low latency, find-my-earbuds and codec selection for Nothing earbuds, over their own Bluetooth control channel.",
+    "category": "Audio",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "hideWhenDisconnected": true,
+      "deviceAddress": "",
+      "helperPath": "",
+      "refreshSeconds": 60
+    },
+    "schema": [
+      {
+        "key": "hideWhenDisconnected",
+        "type": "boolean",
+        "label": "Hide the icon while the earbuds are away",
+        "defaultValue": true
+      },
+      {
+        "key": "deviceAddress",
+        "type": "string",
+        "label": "Bluetooth address (optional)",
+        "description": "Leave empty to use the connected Nothing/Ear/CMF device found by bluetoothctl.",
+        "defaultValue": ""
+      },
+      {
+        "key": "helperPath",
+        "type": "path",
+        "label": "Path to nothing-earctl.py",
+        "description": "Leave empty to use the helper shipped with this plugin.",
+        "defaultValue": ""
+      },
+      {
+        "key": "refreshSeconds",
+        "type": "integer",
+        "label": "Battery refresh interval (seconds)",
+        "description": "How often the bar icon re-reads the earbuds while they are connected (15-900).",
+        "defaultValue": 60,
+        "min": 15,
+        "max": 900
+      }
+    ]
+  }
+}
