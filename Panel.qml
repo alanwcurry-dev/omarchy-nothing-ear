@@ -56,10 +56,14 @@ Panel {
   readonly property bool showLatency: ear.hasControls && ear.latencyAvailable
   readonly property bool showFind: ear.hasControls
   readonly property bool showCodec: ear.connected && ear.codecAvailable
+  // One pair needs no picker; two do.
+  readonly property bool showDevices: ear.nothingDevices.length > 1
 
   // Cursor groups, in panel order: the same order the eye reads them in.
   readonly property var cursorRows: {
     var rows = []
+    if (showDevices)
+      for (var d = 0; d < ear.nothingDevices.length; d++) rows.push("device:" + ear.nothingDevices[d].address)
     if (showNoise) for (var n = 0; n < Model.ANC_VALUES.length; n++) rows.push("anc:" + Model.ANC_VALUES[n])
     if (showEq) for (var e = 0; e < Model.EQ_VALUES.length; e++) rows.push("eq:" + Model.EQ_VALUES[e])
     if (showBass) rows.push("bass")
@@ -72,6 +76,7 @@ Panel {
   // Group boundaries inside the flat row list: j/k steps by group, h/l by row.
   readonly property var cursorGroups: {
     var groups = []
+    if (showDevices) groups.push(ear.nothingDevices.length)
     if (showNoise) groups.push(Model.ANC_VALUES.length)
     if (showEq) groups.push(Model.EQ_VALUES.length)
     if (showBass) groups.push(1)
@@ -113,6 +118,7 @@ Panel {
     var count = cursorGroups[group]
     for (var i = 0; i < count; i++) {
       var name = rows[offsets[group] + i]
+      if (name.indexOf("device:") === 0 && name.substring(7) === ear.targetAddress) return name
       if (name.indexOf("anc:") === 0 && name.substring(4) === ear.noiseKey) return name
       if (name.indexOf("eq:") === 0 && name.substring(3) === ear.eqKey) return name
       if (name === "bass") return name
@@ -160,7 +166,8 @@ Panel {
   }
 
   function activate(name) {
-    if (name.indexOf("anc:") === 0) ear.setAnc(name.substring(4))
+    if (name.indexOf("device:") === 0) ear.selectDevice(name.substring(7))
+    else if (name.indexOf("anc:") === 0) ear.setAnc(name.substring(4))
     else if (name.indexOf("eq:") === 0) ear.setEq(name.substring(3))
     else if (name === "bass") ear.setBass(!ear.bassEnabled)
     else if (name === "latency") ear.setLatency(!ear.latencyEnabled)
@@ -241,6 +248,11 @@ Panel {
     function bass(): string { ear.setBass(!ear.bassEnabled); return ear.bassEnabled ? "on" : "off" }
     function latency(): string { ear.setLatency(!ear.latencyEnabled); return ear.latencyEnabled ? "on" : "off" }
     function codec(): string { ear.cycleCodec(); return ear.activeCodec }
+    function use(device: string): string {
+      if (!ear.selectDevice(device)) return "unknown device: " + device
+      return ear.targetAddress
+    }
+    function devices(): string { return JSON.stringify(ear.deviceList()) }
     function find(side: string): string {
       if (side !== "left" && side !== "right") return "usage: find left|right"
       ear.toggleRing(side)
@@ -253,7 +265,9 @@ Panel {
     function status(): string {
       if (!ear.connected) return "disconnected"
       if (!ear.protocol) return "connected"
-      return Model.ancLabel(ear.noiseKey)
+      var parts = [ear.deviceName !== "" ? ear.deviceName : "device", Model.levelText(root.lowestBud)]
+      parts.push(ear.noiseAvailable ? Model.ancLabel(ear.noiseKey) : "no noise control")
+      return parts.join(" · ")
     }
   }
 
@@ -382,6 +396,46 @@ Panel {
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall
             wrapMode: Text.WordWrap
+          }
+
+          Column {
+            visible: root.showDevices
+            width: parent.width
+            spacing: Style.spacing.md
+
+            PanelSectionHeader {
+              text: "EARBUDS"
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+            }
+
+            GridLayout {
+              width: parent.width
+              columns: 2
+              columnSpacing: Style.spacing.md
+              rowSpacing: Style.spacing.md
+
+              Repeater {
+                model: ear.nothingDevices
+                OptionChip {
+                  required property var modelData
+                  Layout.fillWidth: true
+                  Layout.preferredWidth: 1
+                  label: modelData.name + (modelData.connected ? "" : " · off")
+                  name: "device:" + modelData.address
+                  selected: ear.targetAddress === modelData.address
+                }
+              }
+            }
+
+            Text {
+              width: parent.width
+              text: "The widget reads and controls the selected pair. The others keep their own settings."
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
           }
 
           Column {

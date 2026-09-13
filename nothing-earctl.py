@@ -223,8 +223,12 @@ def bluetoothctl(*args: str) -> str:
 
 
 def paired_devices() -> list[dict[str, str]]:
+    """Bonded devices only, so a pair that is merely in range is never picked."""
+    output = bluetoothctl("devices", "Paired")
+    if not output.strip():
+        output = bluetoothctl("devices")
     devices = []
-    for line in bluetoothctl("devices").splitlines():
+    for line in output.splitlines():
         parts = line.split(" ", 2)
         if len(parts) == 3 and parts[0] == "Device" and ADDRESS_RE.match(parts[1]):
             devices.append({"address": parts[1], "name": parts[2].strip()})
@@ -255,6 +259,22 @@ def choose_device(requested: str = "") -> dict[str, str] | None:
         return connected[0]
     known = [d for d in devices if looks_like_nothing(d["name"])]
     return known[0] if known else None
+
+
+def nothing_device_list() -> list[dict[str, object]]:
+    """Every paired Nothing-family device, connected ones first."""
+    found: list[dict[str, object]] = []
+    for device in paired_devices():
+        if not looks_like_nothing(device["name"]):
+            continue
+        found.append({
+            "address": device["address"],
+            "name": device["name"],
+            "connected": is_connected(device["address"]),
+            "battery": aggregate_battery(device["address"]),
+        })
+    found.sort(key=lambda item: (not item["connected"], str(item["name"])))
+    return found
 
 
 def aggregate_battery(address: str) -> int:
@@ -754,6 +774,7 @@ def main() -> int:
     parser.add_argument("--device", default="", help="Bluetooth address or name")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("status")
+    sub.add_parser("devices")
     sub.add_parser("diagnose")
     anc = sub.add_parser("set-anc")
     anc.add_argument("mode", choices=sorted(ANC_WIRE))
@@ -774,6 +795,9 @@ def main() -> int:
 
     if args.command == "status":
         emit(snapshot(device))
+        return 0
+    if args.command == "devices":
+        emit({"devices": nothing_device_list()})
         return 0
     if args.command == "diagnose":
         emit(diagnose(device))

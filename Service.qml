@@ -54,6 +54,7 @@ Item {
   // spinner until the firmware confirms the new value.
   property var pendingAction: null
   property var queuedAction: null
+  property bool refreshQueued: false
   property bool retryArmed: true
 
   readonly property int minimumVisibleMs: 600
@@ -63,15 +64,24 @@ Item {
   readonly property string defaultHelperPath:
     Qt.resolvedUrl("nothing-earctl.py").toString().replace(/^file:\/\//, "")
   readonly property string helperPath: String(setting("helperPath", defaultHelperPath) || defaultHelperPath)
-  readonly property string configuredAddress: String(setting("deviceAddress", "") || "")
   // How often the bar icon refreshes the battery on its own while connected.
   readonly property int refreshSeconds: Math.max(15, Math.min(900, Number(setting("refreshSeconds", 60)) || 60))
 
+  // Which paired earbuds this widget talks to. A pinned address from settings
+  // wins, then the pair picked in this session, then whatever is connected —
+  // so taking the other pair off the desk keeps working on its own.
+  readonly property string pinnedAddress: String(setting("deviceAddress", "") || "")
+  property string selectedAddress: ""
   readonly property var bluezDevices: Bluetooth.devices ? Bluetooth.devices.values : []
-  readonly property var bluezTarget: findBluezTarget()
-  readonly property bool bluezConnected: !!(bluezTarget && bluezTarget.connected)
-  readonly property real bluezBattery: bluezTarget && bluezTarget.batteryAvailable
-    ? bluezTarget.battery : -1
+  readonly property var nothingDevices: Model.nothingDevices(bluezDevices)
+  readonly property string requestedAddress: pinnedAddress !== "" ? pinnedAddress : selectedAddress
+  readonly property var targetDevice: Model.resolveDevice(nothingDevices, requestedAddress)
+  readonly property string targetAddress: targetDevice ? String(targetDevice.address || "") : ""
+  readonly property bool bluezConnected: !!(targetDevice && targetDevice.connected)
+  // The aggregate battery BlueZ itself reports for the target, used only to
+  // notice that the earbuds' own reading has probably changed.
+  readonly property real targetBattery: targetDevice && targetDevice.batteryAvailable
+    ? targetDevice.battery : -1
 
   readonly property bool applying: actionProcess.running || queuedAction !== null
   readonly property bool hasBattery: Model.anyBattery(leftBud, rightBud, caseBattery, headsetBattery, aggregateBattery)
@@ -86,39 +96,48 @@ Item {
     return value === undefined || value === null ? fallback : value
   }
 
-  function findBluezTarget() {
-    var devices = bluezDevices || []
-    var wanted = configuredAddress.toLowerCase()
-    if (wanted !== "") {
-      for (var i = 0; i < devices.length; i++)
-        if (String(devices[i].address || "").toLowerCase() === wanted) return devices[i]
-    }
-    var known = deviceAddress.toLowerCase()
-    if (known !== "") {
-      for (var j = 0; j < devices.length; j++)
-        if (String(devices[j].address || "").toLowerCase() === known) return devices[j]
-    }
-    for (var k = 0; k < devices.length; k++) {
-      var name = String(devices[k].deviceName || devices[k].name || "").toLowerCase()
-      if (name.indexOf("nothing") >= 0 || name.indexOf("ear") >= 0 || name.indexOf("cmf") >= 0)
-        return devices[k]
-    }
-    return null
-  }
-
   function commandFor(args) {
     // System Python, because a version manager's python3 may be built without
-    // Bluetooth socket support.
+    // Bluetooth socket support. The device is always named explicitly so the
+    // helper cannot pick a different pair than the panel is showing.
     var command = ["/usr/bin/python3", helperPath]
-    if (configuredAddress !== "") command.push("--device", configuredAddress)
+    if (targetAddress !== "") command.push("--device", targetAddress)
     for (var i = 0; i < args.length; i++) command.push(args[i])
     return command
   }
 
+  // Switch which earbuds the widget follows. `query` is an address or any part
+  // of the name, so "open", "ear 3" and a full MAC all work.
+  function selectDevice(query) {
+    var found = Model.findDevice(nothingDevices, query)
+    if (!found) return false
+    selectedAddress = found.address
+    forgetDevice()
+    refresh()
+    return true
+  }
+
+  // What the panel lists when more than one pair is known.
+  function deviceList() {
+    return nothingDevices.map(function (device) {
+      return {
+        address: device.address,
+        name: device.name,
+        connected: device.connected,
+        battery: device.battery
+      }
+    })
+  }
+
   // One process at a time: the control channel is a single slot, so a read
-  // asked for while another call runs is simply dropped.
+  // asked for while another call runs is remembered and taken next instead of
+  // dropped — a device switch must not land on a stale reading.
   function refresh() {
-    if (statusProcess.running || actionProcess.running) return
+    if (statusProcess.running || actionProcess.running) {
+      refreshQueued = true
+      return
+    }
+    refreshQueued = false
     statusProcess.command = commandFor(["status"])
     statusProcess.running = true
   }
@@ -298,13 +317,14 @@ Item {
   }
 
   function setAnc(key) {
-    if (!hasControls || applying) return
+    // Open-ear models (Ear (open)) have no noise control at all.
+    if (!hasControls || !noiseAvailable || applying) return
     beginPending("anc:" + key, key, { noiseKey: key }, { noiseKey: noiseKey })
     runAction(["set-anc", key])
   }
 
   function cycleAnc() {
-    if (!hasControls) return
+    if (!hasControls || !noiseAvailable) return
     setAnc(Model.ANC_VALUES[Model.cycleIndex(Model.ANC_VALUES, noiseKey)])
   }
 
@@ -371,8 +391,9 @@ Item {
     if (root.bluezConnected !== root.connected) root.refresh()
   }
 
-  onBluezBatteryChanged: if (root.bluezConnected) root.refresh()
-  onBluezTargetChanged: if (root.bluezConnected) root.refresh()
+  onTargetBatteryChanged: if (root.bluezConnected) root.refresh()
+  onTargetAddressChanged: if (root.bluezConnected) root.refresh()
+  onSelectedAddressChanged: root.refresh()
 
   Timer {
     id: pollTimer
@@ -442,6 +463,10 @@ Item {
         var next = root.queuedAction
         root.queuedAction = null
         root.runAction(next)
+      }
+      if (root.refreshQueued) {
+        root.refreshQueued = false
+        root.refresh()
       }
     }
   }

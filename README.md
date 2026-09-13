@@ -43,6 +43,33 @@ omarchy bar move frank.nothingear --section right    # or use the bar's own drag
 Pair the earbuds through the normal Bluetooth panel first. The helper picks the
 first connected device whose name contains `Nothing`, `Ear` or `CMF`.
 
+## Multiple pairs
+
+Everything paired is listed in the panel's **EARBUDS** section (the section
+appears only when more than one pair is known, e.g. an Ear (3) and an Ear
+(open)). The widget reads and controls the selected pair; the other keeps its
+own settings on the device.
+
+Which pair it follows, in order:
+
+1. `deviceAddress` from settings, if set — this always wins, even while that
+   pair is away, so a pinned choice is never silently overridden.
+2. The pair picked in the panel or with `omarchy-shell nothing-ear use`, for as
+   long as the shell runs.
+3. Otherwise the connected pair, so taking the other one off the desk keeps the
+   widget useful on its own.
+
+```bash
+omarchy-shell nothing-ear devices          # JSON: every paired pair, connected first
+omarchy-shell nothing-ear use open         # name fragment or a full address
+omarchy-shell nothing-ear use 2C:BE:EE:4B:CF:24
+./nothing-earctl.py devices                # the same list from the CLI
+```
+
+Models differ in what they expose: the Ear (open) has no noise control, so the
+panel leaves that section out and right-click stops cycling it, while battery,
+equalizer, bass enhance, low latency, find-my-earbuds and codec all still work.
+
 ## Settings
 
 | Key | Default | What it does |
@@ -99,11 +126,13 @@ opens the control channel, does one exchange, and closes it:
 
 ```bash
 ./nothing-earctl.py status
+./nothing-earctl.py devices
 ./nothing-earctl.py set-anc high
 ./nothing-earctl.py set-eq bass
 ./nothing-earctl.py set-bass on
 ./nothing-earctl.py set-latency on
 ./nothing-earctl.py set-find right on
+./nothing-earctl.py --device 3C:B0:ED:51:18:FD status
 ./nothing-earctl.py diagnose          # raw payloads, for firmware changes
 ```
 
@@ -129,8 +158,9 @@ applied, so a light bar wants a dark source image.
   own UI for them is out of scope here.
 - Preset numbering (0 Balanced, 1 Voice, 2 More treble, 3 More bass, 5 Custom)
   is verified by write-and-read-back on Nothing Ear (3), firmware 1.0.1.69.
-- Verified on Nothing Ear (3). The protocol is shared across the Ear family, so
-  other Nothing earbuds should work; `diagnose` is there when one does not.
+- Verified on Nothing Ear (3) (firmware 1.0.1.69) and Nothing Ear (open)
+  (1.0.1.28). The protocol is shared across the Ear family, so other Nothing
+  earbuds should work; `diagnose` is there when one does not.
 
 ## Credits
 

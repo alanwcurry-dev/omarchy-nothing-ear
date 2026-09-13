@@ -197,6 +197,66 @@ function cycleIndex(values, current) {
   return index < 0 ? 0 : (index + 1) % values.length
 }
 
+function looksLikeNothing(name) {
+  var value = String(name || "").toLowerCase()
+  return value.indexOf("nothing") >= 0 || value.indexOf("ear") >= 0 || value.indexOf("cmf") >= 0
+}
+
+// Every paired Nothing-family device BlueZ knows about, connected ones first so
+// the list reads the way the panel shows it.
+function nothingDevices(entries) {
+  var found = []
+  var list = entries || []
+  for (var i = 0; i < list.length; i++) {
+    var device = list[i]
+    if (!device) continue
+    var address = String(device.address || "")
+    if (address === "" || device.paired !== true) continue
+    var name = String(device.deviceName || device.name || address)
+    if (!looksLikeNothing(name)) continue
+    found.push({
+      address: address,
+      name: name,
+      connected: device.connected === true,
+      // Quickshell reports BlueZ's aggregate battery as a 0..1 fraction.
+      battery: device.batteryAvailable
+        ? Math.round(device.battery <= 1 ? device.battery * 100 : device.battery)
+        : LEVEL_UNKNOWN
+    })
+  }
+  found.sort(function (a, b) {
+    if (a.connected !== b.connected) return a.connected ? -1 : 1
+    return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0)
+  })
+  return found
+}
+
+// An address or a name fragment, so the panel, the CLI and `omarchy-shell` can
+// all name a device the way a human would.
+function findDevice(devices, query) {
+  var wanted = String(query || "").toLowerCase()
+  if (wanted === "") return null
+  var list = devices || []
+  for (var i = 0; i < list.length; i++)
+    if (String(list[i].address).toLowerCase() === wanted) return list[i]
+  for (var j = 0; j < list.length; j++)
+    if (String(list[j].name).toLowerCase().indexOf(wanted) >= 0) return list[j]
+  return null
+}
+
+// The device the plugin talks to. An address the user pinned (settings) or
+// picked in the panel wins even while it is away, so the choice is never
+// silently overridden; with neither, a connected pair wins, then any known one.
+function resolveDevice(devices, preferredAddress) {
+  var list = devices || []
+  if (list.length === 0) return null
+  var preferred = findDevice(list, preferredAddress)
+  if (preferred) return preferred
+  for (var i = 0; i < list.length; i++)
+    if (list[i].connected) return list[i]
+  return list[0]
+}
+
 // The panel and the service hand readings around as objects, so the helpers
 // take them explicitly instead of guessing at a property name — a dynamic
 // lookup on a QML object is not the same thing as one on parsed JSON.
