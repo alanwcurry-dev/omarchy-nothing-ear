@@ -45,8 +45,8 @@ for 6 hours.
 - PipeWire with `pactl` for the codec picker (the rest of the panel needs
   neither)
 
-No Python packages, no pip install, no daemon: the helper is stdlib only and
-runs for the length of one call.
+No third-party modules and no daemon: the helper is Python standard library
+only and runs for the length of one call.
 
 ## Install
 
